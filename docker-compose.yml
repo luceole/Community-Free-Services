@@ -1,0 +1,250 @@
+version: '2'
+services:
+##################################
+# Backend
+##################################
+
+
+## Base for Nextcloud
+  db-nextcloud:
+    image: mariadb
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: always
+    volumes:
+      #- /mnt/data/mariadb/db:/var/lib/mysql
+      -  ${DATA}/mariadb/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=MyRootPwd;
+      - MYSQL_PASSWORD=MyPassword;
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+
+## Base for Nextcloud
+  mongodb:
+    image: mongo
+    container_name: "mongodb"
+    environment:
+      - MONGO_DATA_DIR=/data/db
+      - MONGO_LOG_DIR=/dev/null
+    volumes:
+      - ${DATA}/lib/db:/data/db
+    #  - ./MongoSave:/backup
+    command: mongod --smallfiles --logpath=/dev/null # --quiet
+    restart: always
+
+  ## Base for Ethercal
+  redis:
+     image: redis:latest
+     volumes:
+      - ${DATA}/lib/redis:/data
+     command: redis-server --appendonly yes
+     #ports:
+      #- 6379:6379
+     restart: unless-stopped
+
+  ## Pseudo LDAP (for MongoDataBase)
+  e-ldap:
+      image: luceole/e-ldap-prod
+      restart: always
+      links:
+        - mongodb:mongodb
+      ports:
+        - 1389:1389
+      environment:
+        - MONGODB_URI=mongodb://mongodb/dbu
+        - PORT=1389
+
+
+  ## Manage Containers
+  portainer:
+     image: portainer/portainer
+     labels:
+       - "traefik.enable=true"
+       - "traefik.frontend.rule=Host:portainer.mim.ovh"
+       - "traefik.port=9000"
+       - "traefik.backend=portainer"
+     volumes:
+        - "/var/run/docker.sock:/var/run/docker.sock"
+     restart: unless-stopped
+
+
+## Reverse Proxy service
+  traefik:
+     image: traefik
+     restart: always
+     ports:
+       - 80:80
+       - 443:443
+       - 8080:8080
+     networks:
+       - web
+       - default
+     environment:
+       -acme=true
+       -acme.entrypoint=https
+       -acme.httpchallenge
+       -acme.httpchallenge.entrypoint=http
+       -acme.email="xxx@domain.fr"
+     volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+       - ./traefik.toml:/etc/traefik/traefik.toml
+       - ./acme.json:/acme.json
+     container_name: traefik
+
+
+
+
+##################################
+# Front Services
+##################################
+
+## Auth SSO
+  keycloak:
+       image: jboss/keycloak
+       restart: always
+       environment:
+        - KEYCLOAK_USER=admin
+        - KEYCLOAK_PASSWORD=MyPassword
+        - PROXY_ADDRESS_FORWARDING=true
+       volumes:
+        - ${DATA}keycloak/standalone/data:/opt/jboss/keycloak/standalone/data
+       links:
+          - e-ldap:e-ldap
+       labels:
+        - "traefik.enable=true"
+        - traefik.port=8080
+        - traefik.backend=keycloak
+        - 'traefik.frontend.rule=Host:${SSO}.${DOMAIN}'
+
+## Main App
+
+  e-user:
+     image: luceole/e-user-prod:0.6
+     restart: always
+     ports:
+        - "8080"
+     volumes:
+        - ${DATA}/e-user/local.env.js:/usr/src/app/server/config/local.env.js
+     depends_on:
+        - traefik
+        - etherpad
+        - keycloak
+     links:
+        - mongodb:mongodb
+     environment:
+        - MONGODB_URI=mongodb://mongodb/dbu
+     labels:
+        - "traefik.enable=true"
+        - traefik.port=8080
+        - traefik.backend=e-user
+        - 'traefik.frontend.rule=Host:${E-USER}.${DOMAIN}'
+
+  #scrumblr:
+  e-board:
+     image: luceole/e-board:0.8
+     restart: unless-stopped
+     volumes:
+       - ${DATA}/board/keycloak.json:/usr/src/app/keycloak.json
+     links:
+       - redis:redis
+     labels:
+       - "traefik.enable=true"
+       - traefik.port=8080
+       - traefik.backend=board
+       - 'traefik.frontend.rule=${E-BOARD}.${DOMAIN}'
+
+# Pad
+  etherpad:
+     image: luceole/etherpad:1.6.5
+     restart: always
+     environment:
+       - ETHERPAD_ADMIN_PASSWORD=mypwd
+       - ETHERPAD_ADMIN_USER= luceole
+     volumes:
+       - ${DATA}/etherpad/APIKEY.txt:/app/APIKEY.txt
+       - ${DATA}/etherpad/settings.json:/app/settings.json
+       - ${DATA}/etherpad/etherpad.sqlite3:/app/var/etherpad.sqlite3
+     depends_on:
+       - traefik
+  #   networks:
+  #     - default
+     labels:
+       - traefik.enable=true
+       - traefik.port=9001
+       - traefik.backend=etherpad
+       - 'traefik.frontend.rule=Host:${PAD}.${DOMAIN}'
+
+# Keycloak Proxy to protect proxycalc
+  proxycalc:
+     image: quay.io/gambol99/keycloak-proxy
+     restart: always
+     links:
+       - ethercalc:ethercalc
+     volumes:
+       - /${DATA}/proxycalc/proxy.cfg:/opt/proxy.cfg
+     entrypoint: "/opt/keycloak-proxy --config /opt/proxy.cfg"
+     depends_on:
+       - traefik
+     labels:
+       - "traefik.enable=true"
+       - traefik.port=3000
+       - traefik.backend=proxycalc
+       - 'traefik.frontend.rule=Host:${CALC}.${DOMAIN}'
+
+  ethercalc:
+      image: audreyt/ethercalc
+      restart: unless-stopped
+      environment:
+       - REDIS_PORT_6379_TCP_ADDR=redis
+       - REDIS_PORT_6379_TCP_PORT=6379
+      depends_on:
+        - traefik
+      #labels:
+        #- "traefik.enable=true"
+        #- traefik.port=8000
+        #- traefik.backend=ethercalc
+        #- 'traefik.frontend.rule=Host:calc.mim.ovh'
+      links:
+        - redis:redis
+      restart: always
+
+  # Files Exchanges
+  file-pizza:
+       image: luceole/file-pizza:0.5
+       restart: always
+       depends_on:
+          - traefik
+       networks:
+          - default
+       labels:
+         - traefik.enable=true
+         - traefik.port=80
+         - traefik.backend=:file-pizza
+         #- 'traefik.frontend.auth.basic=test:$$apr1$$Xdsjdqfk$$AmiT9NayPehXzLsaRfwqk1'
+         - 'traefik.frontend.rule=Host:${FILE-PIZZA}.${DOMAIN}'
+
+# Nextcloud
+  nextcloud:
+      image: nextcloud:15
+      restart: always
+      volumes:
+        #-  /mnt/data/nextcloud:/var/www/html
+        -  ${DATA}/nextcloud:/var/www/html
+      environment:
+
+        - MYSQL_HOST=db-nextcloud
+        - MYSQL_PASSWORD=MyPassword; #Password for the database user using mysql / mariadb.
+        - MYSQL_DATABASE=nextcloud   #Name of the database using mysql / mariadb.
+        - MYSQL_USER=nextcloud       #Username for the database using mysql / mariadb.
+        #- SQLITE_DATABASE=nextcloud
+        #- NEXTCLOUD_ADMIN_USER=nextadm
+        #- NEXTCLOUD_ADMIN_PASSWORD=MyAdminPassword
+      labels:
+        - "traefik.enable=true"
+        - traefik.port=80
+        - traefik.backend=nextcloud
+        - 'traefik.frontend.rule=Host:${NEXTCLOUD}.${DOMAIN}'
+
+networks:
+  web:
+    external: true
