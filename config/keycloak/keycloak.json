@@ -1,0 +1,10 @@
+{
+  "realm": "mim",
+  "auth-server-url": "https://sso.mondomain.fr/auth",
+  "ssl-required": "external",
+  "resource": "grp",
+  "credentials": {
+    "secret": ""
+  },
+  "confidential-port": 0
+}

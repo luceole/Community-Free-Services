@@ -80,15 +80,11 @@ services:
        - web
        - default
      environment:
-       -acme=true
-       -acme.entrypoint=https
-       -acme.httpchallenge
-       -acme.httpchallenge.entrypoint=http
-       -acme.email="xxx@domain.fr"
+       - acme=true
      volumes:
        - /var/run/docker.sock:/var/run/docker.sock
-       - ./traefik.toml:/etc/traefik/traefik.toml
-       - ./acme.json:/acme.json
+       - ${CONFIG}/traefik/traefik.toml:/etc/traefik/traefik.toml
+       - ${CONFIG}/traefik/acme.json:/acme.json
      container_name: traefik
 
 
@@ -107,7 +103,7 @@ services:
         - KEYCLOAK_PASSWORD=MyPassword
         - PROXY_ADDRESS_FORWARDING=true
        volumes:
-        - ${DATA}keycloak/standalone/data:/opt/jboss/keycloak/standalone/data
+        - ${DATA}/keycloak/standalone/data:/opt/jboss/keycloak/standalone/data
        links:
           - e-ldap:e-ldap
        labels:
@@ -119,12 +115,12 @@ services:
 ## Main App
 
   e-user:
-     image: luceole/e-user-prod:0.6
+     image: luceole/e-user:0.6.0
      restart: always
      ports:
         - "8080"
      volumes:
-        - ${DATA}/e-user/local.env.js:/usr/src/app/server/config/local.env.js
+        - ${CONFIG}/local.env.js:/usr/src/app/server/config/local.env.js
      depends_on:
         - traefik
         - etherpad
@@ -137,21 +133,21 @@ services:
         - "traefik.enable=true"
         - traefik.port=8080
         - traefik.backend=e-user
-        - 'traefik.frontend.rule=Host:${E-USER}.${DOMAIN}'
+        - 'traefik.frontend.rule=Host:${EUSER}.${DOMAIN}'
 
   #scrumblr:
   e-board:
      image: luceole/e-board:0.8
      restart: unless-stopped
      volumes:
-       - ${DATA}/board/keycloak.json:/usr/src/app/keycloak.json
+       - config/keycloak.json:/usr/src/app/keycloak.json
      links:
        - redis:redis
      labels:
        - "traefik.enable=true"
        - traefik.port=8080
        - traefik.backend=board
-       - 'traefik.frontend.rule=${E-BOARD}.${DOMAIN}'
+       - 'traefik.frontend.rule=${EBOARD}.${DOMAIN}'
 
 # Pad
   etherpad:
@@ -161,8 +157,8 @@ services:
        - ETHERPAD_ADMIN_PASSWORD=mypwd
        - ETHERPAD_ADMIN_USER= luceole
      volumes:
-       - ${DATA}/etherpad/APIKEY.txt:/app/APIKEY.txt
-       - ${DATA}/etherpad/settings.json:/app/settings.json
+       - ${CONFIG}/etherpad/APIKEY.txt:/app/APIKEY.txt
+       - ${CONFIG}/etherpad/settings.json:/app/settings.json
        - ${DATA}/etherpad/etherpad.sqlite3:/app/var/etherpad.sqlite3
      depends_on:
        - traefik
@@ -181,7 +177,7 @@ services:
      links:
        - ethercalc:ethercalc
      volumes:
-       - /${DATA}/proxycalc/proxy.cfg:/opt/proxy.cfg
+       - ${CONFIG}/proxycalc/proxy.cfg:/opt/proxy.cfg
      entrypoint: "/opt/keycloak-proxy --config /opt/proxy.cfg"
      depends_on:
        - traefik
@@ -221,7 +217,7 @@ services:
          - traefik.port=80
          - traefik.backend=:file-pizza
          #- 'traefik.frontend.auth.basic=test:$$apr1$$Xdsjdqfk$$AmiT9NayPehXzLsaRfwqk1'
-         - 'traefik.frontend.rule=Host:${FILE-PIZZA}.${DOMAIN}'
+         - 'traefik.frontend.rule=Host:${FILEPIZZA}.${DOMAIN}'
 
 # Nextcloud
   nextcloud:

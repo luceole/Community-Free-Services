@@ -18,3 +18,12 @@ address = ":8080"
   domain = "docker.localhost"
   watch = true
   exposedbydefault = false
+
+[acme]
+  email = "me@valide-adresse.fr"
+  storage = "acme.json"
+  entryPoint = "https"
+  OnHostRule = true
+
+[acme.httpChallenge]
+  entryPoint = "http"

@@ -1,0 +1,15 @@
+{
+  "title": "MIM PAD",
+  "ip": "0.0.0.0",
+  "port" :9001,
+  "dbType" : "sqlite",
+  "dbSettings" : { "filename" : "var/etherpad.sqlite3" },
+  "defaultPadText" : "Bienvenue sur MIM PAD",
+  "requireSession" : false,
+  "users": {
+    "adminpad": {
+      "password": "nogoodadmpwd",
+      "is_admin": true
+    }
+  },
+}
