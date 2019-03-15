@@ -120,7 +120,7 @@ services:
      ports:
         - "8080"
      volumes:
-        - ${CONFIG}/local.env.js:/usr/src/app/server/config/local.env.js
+        - ${CONFIG}/e-user/local.env.js:/usr/src/app/server/config/local.env.js
      depends_on:
         - traefik
         - etherpad
@@ -140,7 +140,7 @@ services:
      image: luceole/e-board:0.8
      restart: unless-stopped
      volumes:
-       - config/keycloak.json:/usr/src/app/keycloak.json
+       - ${CONFIG}/keycloak.json:/usr/src/app/keycloak.json
      links:
        - redis:redis
      labels:
