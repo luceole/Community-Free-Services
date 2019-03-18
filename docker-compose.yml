@@ -14,8 +14,8 @@ services:
       #- /mnt/data/mariadb/db:/var/lib/mysql
       -  ${DATA}/mariadb-nxt/db:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=MyRootPwd;
-      - MYSQL_PASSWORD=MyPassword;
+      - MYSQL_ROOT_PASSWORD=${DBROOTPWD}
+      - MYSQL_PASSWORD=${DBNXTPWD}
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
 
@@ -26,10 +26,10 @@ services:
     restart: always
     volumes:
     #- /mnt/data/mariadb/db:/var/lib/mysql
-      -  ${DATA}/mariadb-kck/db:/var/lib/mysql
+      - ${DATA}/mariadb-kck/db:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=MyRootPwd;
-      - MYSQL_PASSWORD=MyPasswd;
+      - MYSQL_ROOT_PASSWORD=${DBROOTPWD}
+      - MYSQL_PASSWORD=${DBKCKPWD}
       - MYSQL_DATABASE=keycloak
       - MYSQL_USER=keycloak
 
@@ -111,16 +111,23 @@ services:
 ## Auth SSO
   keycloak:
        image: jboss/keycloak
-       restart: always
+       #restart: unless-stopped
        environment:
         - KEYCLOAK_USER=admin
         - KEYCLOAK_PASSWORD=MyPassword
         - PROXY_ADDRESS_FORWARDING=true
+        - DB_VENDOR=MYSQL
+        - DB_DATABASE=keycloak
         - DB_ADDR=db-keycloak
+        - DB_USER=keycloak
+        - DB_PASSWORD=${DBKCKPWD}
+
        volumes:
         - ${DATA}/keycloak/standalone/data:/opt/jboss/keycloak/standalone/data
        links:
           - e-ldap:e-ldap
+          - db-keycloak:db-keycloak
+
        labels:
         - "traefik.enable=true"
         - traefik.port=8080
@@ -155,7 +162,7 @@ services:
      image: luceole/e-board:0.8
      restart: unless-stopped
      volumes:
-       - ${CONFIG}/keycloak.json:/usr/src/app/keycloak.json
+       - ${CONFIG}/keycloak/keycloak.json:/usr/src/app/keycloak.json
      links:
        - redis:redis
      labels:
@@ -242,9 +249,8 @@ services:
         #-  /mnt/data/nextcloud:/var/www/html
         -  ${DATA}/nextcloud:/var/www/html
       environment:
-
         - MYSQL_HOST=db-nextcloud
-        - MYSQL_PASSWORD=MyPassword; #Password for the database user using mysql / mariadb.
+        - MYSQL_PASSWORD= ${DBNXTPWD} #Password for the database user using mysql / mariadb.
         - MYSQL_DATABASE=nextcloud   #Name of the database using mysql / mariadb.
         - MYSQL_USER=nextcloud       #Username for the database using mysql / mariadb.
         #- SQLITE_DATABASE=nextcloud
