@@ -12,14 +12,28 @@ services:
     restart: always
     volumes:
       #- /mnt/data/mariadb/db:/var/lib/mysql
-      -  ${DATA}/mariadb/db:/var/lib/mysql
+      -  ${DATA}/mariadb-nxt/db:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=MyRootPwd;
       - MYSQL_PASSWORD=MyPassword;
       - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=nextcloud
 
-## Base for Nextcloud
+## Base for Keycloak
+  db-keycloak:
+    image: mariadb
+    #command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: always
+    volumes:
+    #- /mnt/data/mariadb/db:/var/lib/mysql
+      -  ${DATA}/mariadb-kck/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=MyRootPwd;
+      - MYSQL_PASSWORD=MyPasswd;
+      - MYSQL_DATABASE=keycloak
+      - MYSQL_USER=keycloak
+
+## Base for E-User
   mongodb:
     image: mongo
     container_name: "mongodb"
@@ -102,6 +116,7 @@ services:
         - KEYCLOAK_USER=admin
         - KEYCLOAK_PASSWORD=MyPassword
         - PROXY_ADDRESS_FORWARDING=true
+        - DB_ADDR=db-keycloak
        volumes:
         - ${DATA}/keycloak/standalone/data:/opt/jboss/keycloak/standalone/data
        links:
